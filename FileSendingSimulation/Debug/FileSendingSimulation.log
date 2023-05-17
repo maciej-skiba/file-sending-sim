@@ -1,0 +1,8 @@
+﻿  functions.cpp
+C:\Users\Maciej\source\repos\FileSendingSimulation\FileSendingSimulation\functions.cpp(12,37): warning C4244: '=': conversion from 'std::streamoff' to 'size_t', possible loss of data
+C:\Users\Maciej\source\repos\FileSendingSimulation\FileSendingSimulation\functions.cpp(20,45): warning C4101: 'e': unreferenced local variable
+C:\Users\Maciej\source\repos\FileSendingSimulation\FileSendingSimulation\functions.cpp(89,15): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
+C:\Users\Maciej\source\repos\FileSendingSimulation\FileSendingSimulation\functions.cpp(91,29): warning C4244: '+=': conversion from 'double' to 'int', possible loss of data
+C:\Users\Maciej\source\repos\FileSendingSimulation\FileSendingSimulation\functions.cpp(132,23): warning C4018: '<': signed/unsigned mismatch
+C:\Users\Maciej\source\repos\FileSendingSimulation\FileSendingSimulation\functions.cpp(194,29): warning C4244: 'initializing': conversion from 'float' to 'size_t', possible loss of data
+  FileSendingSimulation.vcxproj -> C:\Users\Maciej\source\repos\FileSendingSimulation\Debug\FileSendingSimulation.exe
