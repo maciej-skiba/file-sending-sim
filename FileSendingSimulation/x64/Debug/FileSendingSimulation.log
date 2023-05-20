@@ -1,8 +1,0 @@
-﻿  functions.cpp
-C:\Users\Maciej\Documents\GitHub\File_sending_sim\FileSendingSimulation\functions.cpp(114,15): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-C:\Users\Maciej\Documents\GitHub\File_sending_sim\FileSendingSimulation\functions.cpp(116,28): warning C4244: '+=': conversion from 'double' to 'int', possible loss of data
-C:\Users\Maciej\Documents\GitHub\File_sending_sim\FileSendingSimulation\functions.cpp(198,29): warning C4244: 'initializing': conversion from 'float' to 'size_t', possible loss of data
-  main.cpp
-C:\Users\Maciej\Documents\GitHub\File_sending_sim\FileSendingSimulation\main.cpp(5,25): warning C4244: 'argument': conversion from 'time_t' to 'unsigned int', possible loss of data
-  Generating Code...
-  FileSendingSimulation.vcxproj -> C:\Users\Maciej\Documents\GitHub\File_sending_sim\x64\Debug\FileSendingSimulation.exe
