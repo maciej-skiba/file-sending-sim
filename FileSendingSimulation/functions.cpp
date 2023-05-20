@@ -4,7 +4,7 @@
 /// Reads file at puts it to MyFile structure.
 /// </summary>
 /// <param name="fileName">Name of the filename, which must be in project folder</param>
-/// <returns></returns>
+/// <returns>Imported file in FileStruct object</returns>
 FileStruct readFileBytes(std::string fileName)
 {
     FileStruct MyFile;
@@ -22,7 +22,7 @@ FileStruct readFileBytes(std::string fileName)
 
         return MyFile;
     }
-    catch (const std::bad_array_new_length& e)
+    catch (std::bad_array_new_length&)
     {
         std::cout << "There was problem with assigning file length.\nProgram will terminate.";
         std::exit(0);
@@ -37,14 +37,13 @@ FileStruct readFileBytes(std::string fileName)
         std::cout << "Unknown exception occurred.\nProgram will terminate.";
         std::exit(0);
     }
-
 }
 
 /// <summary>
 /// Bytes to bitset<8> conversion function
 /// </summary>
 /// <param name="byte">Byte to convert</param>
-/// <returns></returns>
+/// <returns>8-bit set</returns>
 std::bitset<8> ToBits(char byte)
 {
     return std::bitset<8>(byte);
@@ -55,8 +54,8 @@ std::bitset<8> ToBits(char byte)
 /// </summary>
 /// <param name="packet">Packet of bytes</param>
 /// <param name="PacketLength">Packet length</param>
-/// <returns> return 0= even 1=odd </returns>
-bool parityBit(const std::string& packet, int PacketLength)
+/// <returns>return 0= even 1=odd</returns>
+int ParityBit(const char packet[], int PacketLength)
 {
     int sum = 0;
 
@@ -77,9 +76,8 @@ bool parityBit(const std::string& packet, int PacketLength)
 /// </summary>
 /// <param name="packet">Packet of bytes</param>
 /// <param name="PacketLength">Packet length</param>
-/// <param name="mod">Modulo to use</param>
-/// <returns>return 0= even 1=odd</returns>
-int moduloSum(const char packet[], int PacketLength, int mod) 
+/// <returns>Sum of bytes in packets #modulo operation# N</returns>
+int ModuloSum(const char packet[], int PacketLength) 
 {
     int sum = 0;
     for (int i = 0; i < PacketLength; i++)
@@ -87,20 +85,19 @@ int moduloSum(const char packet[], int PacketLength, int mod)
         sum += abs((int)packet[i]);
     }
 
-    //std::cout << "sum = " << sum << std::endl;
-    return sum % mod;
+    return sum % MODULO;
 }
 /// <summary>
-/// 
+/// Calculates packet's Crc checksum
 /// </summary>
 /// <param name="packet"></param>
-/// <param name="n"></param>
-/// <returns></returns>
-int crc(const char packet[], int n)
+/// <param name="PacketLength">Packet length</param>
+/// <returns>Crc checksum result</returns>
+int Crc(const char packet[], int packetLength)
 {
     std::bitset<N * 8 + CRC> b;          //N and crc_ defined by preprocessor
 
-    for (int i = 0; i < n; ++i)
+    for (int i = 0; i < packetLength; ++i)
     {
         char c = packet[i];
         for (int j = 7; j >= 0 && c; --j) {
@@ -110,11 +107,12 @@ int crc(const char packet[], int n)
             c >>= 1;
         }
     }
+
     b <<= CRC;    //move the bitset to prepare for calculating crc
 
     //-------Preparing crc divider-------
     int power = pow(2, CRC) - 1;
-    int crc_rand = rand() % power;// e.g. for CRC-3 gives nr 1-15
+    int crc_rand = CRC_RANDOM % power;// e.g. for CRC-3 gives nr 1-15
     crc_rand += pow(2, CRC); //adding extra "1" to the left
 
     std::bitset<N * 8 + CRC> b_divider(crc_rand);
@@ -143,11 +141,12 @@ int crc(const char packet[], int n)
 /// Simulates sending data 
 /// </summary>
 /// <param name="MyFile"> Imported file as str</param>
-/// <param name="n"></param>
-/// <param name="errors_list"></param>
+/// <param name="packetSize">Size of packet</param>
+/// <param name="errors_list">List or corrupted bytes</param>
 /// <param name="file_name"></param>
+/// <param name="checkSumChoice">Parity bit/Modulo sum/Crc</param>
 void SendData(FileStruct const& MyFile, int packetSize, std::list<int>& errors_list,
-               std::string file_name, IntegrityCheck integrityCheckChoice)
+               std::string file_name, const CheckSum checkSumChoice)
 {
     bool moduloEqualsZero = true;
     size_t amountOfPackets = MyFile.filelength / packetSize;     //divide file into n-bytes packets
@@ -162,34 +161,27 @@ void SendData(FileStruct const& MyFile, int packetSize, std::list<int>& errors_l
 
     for (int i = 0; i < amountOfPackets; i++)   //making headers
     {
-        PacketStruct<int> packet;             //atm <int> only
+        PacketStruct<int> packet;
         packet.header.ID = i;
 
         //-----------Write size of the packet to "header"-----------
+
         if (i == (amountOfPackets - 1) && moduloEqualsZero == false)
         {
             packet.header.PacketSize = MyFile.filelength % packetSize;
         }
         else (packet.header.PacketSize = packetSize);
+
         //----------------------------------------------------------
-
-        switch (integrityCheckChoice)
-        {
-            case ParityBit:
-                packet.controlSum = parityBit(packet.PacketData, packetSize);
-                break;
-            case ModuloSum:
-                packet.controlSum = moduloSum(packet.PacketData, packetSize, MODULO);
-                break;
-            case Crc:
-                packet.controlSum = crc(packet.PacketData, packetSize);
-                break;
-        }
-
-        SendPacket(packet, errors_list, MyFile, packetSize, i);
+        
+        SendPacket(packet, errors_list, MyFile, packetSize, i, checkSumChoice);
+        
+        ReceiveAndVerifyPacket(packet, checkSumChoice, packetSize);
         
         outfile.write(packet.PacketData, 10);
     }
+
+    PrintSectionEnd();
 }
 
 /// <summary>
@@ -197,9 +189,12 @@ void SendData(FileStruct const& MyFile, int packetSize, std::list<int>& errors_l
 /// </summary>
 /// <param name="filelength"> Length of imported file in bytes </param>
 /// <param name="errorpercentage"> How many bytes of the file should be changed </param>
-/// <param name="errors_list"> </param>
-void InvalidBytesIndexes(size_t filelength, float errorpercentage, std::list<int>& errors_list)
+/// <param name="errors_list">List or corrupted bytes</param>
+/// <param name="packetSize">Size of packet</param>
+void InvalidBytesIndexes(size_t filelength, float errorpercentage, std::list<int>& errors_list, int packetSize)
 {
+    std::cout << "Simulating packet corruption...\n\n";
+
     size_t amount_of_errors = (filelength * errorpercentage / 100);
 
     for (size_t i = 0; i < amount_of_errors; i++)
@@ -208,7 +203,13 @@ void InvalidBytesIndexes(size_t filelength, float errorpercentage, std::list<int
     }
     errors_list.sort();
 
-    std::cout << std::endl << errors_list.size() << std::endl;
+    for (auto corruptedByte : errors_list)
+    {
+        int corruptedPacketNumber = corruptedByte / packetSize;
+        std::cout << "Changing file's byte number " << corruptedByte << " (packet no. " << corruptedPacketNumber << ")\n";
+    }
+
+    PrintSectionEnd();
 }
 
 /// <summary>
@@ -220,9 +221,18 @@ void InvalidBytesIndexes(size_t filelength, float errorpercentage, std::list<int
 /// <param name="MyFile">File to read</param>
 /// <param name="packetSize">Packet size</param>
 /// <param name="packetIndex">Index of packet</param>
-void SendPacket(PacketStruct<int>& packet, std::list<int>& errors_list, FileStruct const& MyFile, 
-    int packetSize, int packetIndex)
+/// <param name="checkSumChoice">Parity bit/Modulo sum/Crc</param>
+void SendPacket(PacketStruct<int> &packet, std::list<int> &errors_list, FileStruct const& MyFile, 
+    int packetSize, int packetIndex, const CheckSum checkSumChoice)
 {
+    for (int k = 0; k < packet.header.PacketSize; k++)
+    {
+        packet.PacketData[k] = MyFile.file[packetIndex * packetSize + k];
+    }
+
+    packet.checkSum = ReturnPacketCheckSum(packet, checkSumChoice, packetSize);
+
+    // Byte corruption; "Hum" simulation
     for (int k = 0; k < packet.header.PacketSize; k++)
     {
         if (errors_list.size() > 0)
@@ -246,7 +256,76 @@ void SendPacket(PacketStruct<int>& packet, std::list<int>& errors_list, FileStru
     }
 }
 
-void ReceiveAndVerifyPacket(const PacketStruct<int> packet, IntegrityCheck integrityCheckChoice)
+/// <summary>
+/// Receive and verify packet integrity using checksum function
+/// </summary>
+/// <param name="packet">Packet struct</param>
+/// <param name="checkSumChoice">Parity bit/Modulo sum/Crc</param>
+/// <param name="packetSize">Packet size</param>
+void ReceiveAndVerifyPacket(const PacketStruct<int> &packet, CheckSum checkSumChoice, const int packetSize)
 {
-    // TODO: Verify each packet of the file with integrityCheck
+    int checkSumOfReceivedPacket = ReturnPacketCheckSum(packet, checkSumChoice, packetSize);
+
+    if (checkSumOfReceivedPacket != packet.checkSum)
+    {
+        std::cout << "Packet number " << packet.header.ID << " is corrupted!\n";
+    }
+}
+
+/// <summary>
+/// Return checksum of packet
+/// </summary>
+/// <param name="packet">Packet struct</param>
+/// <param name="checkSumChoice">Parity bit/Modulo sum/Crc</param>
+/// <param name="packetSize">Packet size</param>
+/// <returns>Packet checksum</returns>
+int ReturnPacketCheckSum(const PacketStruct<int> &packet, const CheckSum checkSumChoice, const int packetSize)
+{
+    switch (checkSumChoice)
+    {
+        case CheckSum::ParityBit:
+            return ParityBit(packet.PacketData, packetSize);
+            break;
+        case CheckSum::ModuloSum:
+            return ModuloSum(packet.PacketData, packetSize);
+            break;
+        case CheckSum::Crc:
+            return Crc(packet.PacketData, packetSize);
+            break;
+    }
+
+    throw WrongCheckSumException();
+}
+
+/// <summary>
+/// Print section end with dashes
+/// </summary>
+void PrintSectionEnd()
+{
+    std::cout << "\n-------------------------------------\n";
+}
+
+/// <summary>
+/// Welcome message at the begin
+/// </summary>
+void WelcomeMessage()
+{
+    std::cout << "######################################\n";
+    std::cout << "####### FILE SENDING SIMULATOR #######\n";
+    std::cout << "######################################\n\n";
+
+    std::cout << "This program simulates sending a file as packets of data\nand corrupts some of the bytes " <<
+        "to simulate how received files would look like\nif there was no packet integrity checking.\n\n" <<
+        "To visualize the result as \"newimage.jpg\", it is recommended to use \"image.jpg\" as testing file,\n" <<
+        "which is included in the project directory.\n\n";
+
+    std::cout << "WARNING! Program is not malicious input proof, so please follow the input instructions.\n";
+
+    PrintSectionEnd();
+    std::cout << std::endl;
+}
+
+void WrongCheckSumException::PrintException()
+{
+    std::cout << "Error! You entered wrong number while choosing the checksum!\n";
 }
